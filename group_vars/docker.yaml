@@ -1,0 +1,8 @@
+---
+docker:
+  prod:
+    vars:
+      username: baal
+  dev:
+    vars:
+      username: ubuntu
