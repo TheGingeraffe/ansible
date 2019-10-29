@@ -1,2 +1,2 @@
-inventories/group_vars
-inventories/host_vars
+inventories/group_vars/*
+inventories/host_vars/*
