@@ -1,0 +1,11 @@
+---
+
+- name: Ping-Pong
+  gather_facts: false
+  hosts:
+          dev
+  tasks:
+
+    - name: Ping me
+      debug: 
+        msg: Pong

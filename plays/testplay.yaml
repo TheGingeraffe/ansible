@@ -3,13 +3,9 @@
 - name: Ansible test playbook
   gather_facts: false
   hosts:
-          prod
           dev
   tasks:
 
     - name: Test connection
       debug:
         msg: "I did it."
-
-    - name: Ping me
-      ping:
