@@ -23,3 +23,6 @@ dev
 [docker:children]
 prod
 dev
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
