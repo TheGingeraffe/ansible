@@ -1,1 +1,18 @@
 ---
+## Sets target hostname. Target host needs dbus for hostname module.
+
+- name: Set hostnames
+  gather_facts: false
+  become: yes
+  hosts:
+          hephaestus
+  tasks:
+
+    - name: Check dbus
+      apt:
+        name: dbus
+        force_apt_get: yes
+
+    - name: Set hostname
+      hostname:
+        name: hephaestus
