@@ -1,11 +1,9 @@
 ---
-
+# Tests connection
 - name: Ansible test playbook
   gather_facts: false
-  hosts:
-          dev
+  hosts: all
   tasks:
-
     - name: Test connection
       debug:
-        msg: "I did it."
+        msg: "It worked."
