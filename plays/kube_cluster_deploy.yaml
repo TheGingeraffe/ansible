@@ -1,97 +1,98 @@
 ---
 # Playbook for deploying kubeadm on target hosts
 
- - name: Kubeadm prechecks
-   hosts: dev
-   become: yes
+- name: Kubeadm prechecks
+  hosts: dev
+  become: yes
 
-   tasks:
+  tasks:
+    - name: Disable swap
+      command: swapoff --all
 
-   - name: Disable swap
-     command: swapoff --all
-
-   - name: Check if legacy iptables options exist
-     apt:
+    - name: Check if legacy iptables options exist
+      apt:
         force_apt_get: yes
         pkg:
-        - iptables
-        - arptables
-        - ebtables
+          - iptables
+          - arptables
+          - ebtables
 # Only run this if you have to!
 #  - name: Update iptables options for kubeadm compatibility
-  #  command: "{{ item }}"
-  #  args:
-    # with_items:
-    #  - update-alternatives --set iptables /usr/sbin/iptables-legacy
-    #  - update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-    #  - update-alternatives --set arptables /usr/sbin/arptables-legacy
-    #  - update-alternatives --set ebtables /usr/sbin/ebtables-legacy
- 
- - name: Open ports for master
-   hosts: master
-   become: yes
+#  command: "{{ item }}"
+#  args:
+# with_items:
+#  - update-alternatives --set iptables /usr/sbin/iptables-legacy
+#  - update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+#  - update-alternatives --set arptables /usr/sbin/arptables-legacy
+#  - update-alternatives --set ebtables /usr/sbin/ebtables-legacy
 
-   tasks:
+- name: Updating firewall rules for master
+  hosts: master
+  become: yes
 
-   - name: Add iptables rules for master node
-     iptables:
-       chain: INPUT
-       protocol: tcp
-       destination_port: "{{ item }}"
-       jump: ACCEPT
-     with_items:
+  tasks:
+    - name: Add iptables rules for master node
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        jump: ACCEPT
+      with_items:
         - "6443"
         - "2379:2380"
         - "10250"
         - "10251"
         - "10252"
 
- - name: Updating firewall rules for cluster
-   hosts: workers
-   become: yes
-   
-   tasks:
-   
-   - name: Add iptables rules for worker nodes
-     iptables:
-       chain: INPUT
-       protocol: tcp
-       destination_port: "{{ item }}"
-       jump: ACCEPT
-     with_items:
-      - "10250"
-      - "30000:32767"
- 
- - name: Package installations
-   become: yes
-   hosts:
-     dev
-   tasks:
+- name: Updating firewall rules for workers
+  hosts: workers
+  become: yes
 
-   - name: Install dependencies
-     apt:
-      pkg: 
-      - docker
-      - apt-transport-https
-      - curl
-      force_apt_get: yes
-  
-   - name: Add Kubernetes repo
-     shell:
-     cmd: |
-       curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-       cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
-       deb https://apt.kubernetes.io/ kubernetes-xenial main
-       EOF
+  tasks:
+    - name: Add iptables rules for worker nodes
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        jump: ACCEPT
+      with_items:
+        - "10250"
+        - "30000:32767"
 
-   - name: Install kubeadm stuff
-     apt:
-      update_cache: yes
-      force_apt_get: yes
-      pkg:
-       - kubeadm
-       - kubelet
-       - kubectl
+- name: Package installations
+  become: yes
+  hosts: dev
+  tasks:
+    - name: Install dependencies
+      apt:
+        pkg:
+          - docker
+          - apt-transport-https
+          - curl
+        force_apt_get: yes
 
-   - name: Hold back Kube updates
-     command: apt-mark hold kubelet kubeadm kubectl
+    - name: Add Kubernetes repo
+      shell:
+      cmd: |
+        curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+        cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+        deb https://apt.kubernetes.io/ kubernetes-xenial main
+        EOF
+
+    - name: Install kubeadm stuff
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+        pkg:
+          - kubeadm
+          - kubelet
+          - kubectl
+
+    - name: Hold back Kube updates
+      command: apt-mark hold kubelet kubeadm kubectl
+
+    - name: Restart kubelet
+      shell:
+      cmd: |
+        systemctl daemon-reload
+        systemctl restart kubelet
