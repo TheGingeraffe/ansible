@@ -9,7 +9,7 @@
     - name: Disable swap
       command: swapoff --all
 
-# iptables checks start here
+    # iptables checks start here
     - name: Check if legacy iptables options exist
       apt:
         force_apt_get: yes
@@ -105,20 +105,73 @@
 - name: Install Pod Network Plugin
   hosts: dev
   become: yes
-  
+
   tasks:
-   - name: Pass bridged IPv4 traffic to iptables' chains
-     command: sysctl net.bridge.bridge-nf-call-iptables=1
-   - name: Install Weave Net
-     shell:
-     cmd: |
-      kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"     
-   - name: Configure portmap k8s plugin
-     copy:
-      src: /home/theone/projects/ansible/includes/10-weave.conflist
-      dest: /etc/cni/net.d/10-weave.conflist
-      owner: ubuntu
-      group: ubuntu
-      mode: '0644'
-      # add confg to /etc/cni/net.d/10-weave.conflist
-      # add confg to /opt/cni/bin/portmap
+    # iptables setup
+    - name: Pass bridged IPv4 traffic to iptables' chains
+      command: sysctl net.bridge.bridge-nf-call-iptables=1
+    - name: Open TCP 6783 in
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "6783"
+        jump: ACCEPT
+    - name: Open TCP 6783 out
+      iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination_port: "6783"
+        jump: ACCEPT
+    - name: Open UDP 6783/6784 in
+      iptables:
+        chain: INPUT
+        protocol: udp
+        destination_port: "6783:6784"
+        jump: ACCEPT
+    - name: Open UDP 6783/6784 out
+      iptables:
+        chain: OUTPUT
+        protocol: udp
+        destination_port: "6783:6784"
+        jump: ACCEPT
+    # weave installation
+    - name: Install Weave Net
+      shell:
+      cmd: |
+        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+    # portmap setup
+    - name: Install portmap binary to /opt/cni/bin/portmap
+      shell:
+      cmd: |
+        git clone https://github.com/containernetworking/plugins
+        cd plugins
+        ./build.sh
+        cp bin/* /opt/cni/bin/
+    - name: Copy portmap config to /etc/cni/net.d/10-weave.conflist
+      copy:
+        src: /home/theone/projects/ansible/includes/10-weave.conflist
+        dest: /etc/cni/net.d/10-weave.conflist
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+- name: Initialize control plane node
+  hosts: master
+  become: yes
+
+  tasks:
+    - name: Verify connectivity to registry
+      command: kubeadm config images pull
+
+    - name: Initialize master node
+      command: kubeadm init --control-plane-endpoint=192.168.0.102 kronos --node-name master
+      register: init_output
+
+    - name: Setup kubectl for non-root user
+      shell:
+      cmd: |
+        mkdir -p $HOME/.kube
+        cp /etc/kubernetes/admin.conf $HOME/.kube/config
+        chown ubuntu. $HOME/.kube/config
+          
+           # kubelet --network-plugin=portmap
