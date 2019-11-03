@@ -9,6 +9,7 @@
     - name: Disable swap
       command: swapoff --all
 
+# iptables checks start here
     - name: Check if legacy iptables options exist
       apt:
         force_apt_get: yes
@@ -59,6 +60,8 @@
         - "10250"
         - "30000:32767"
 
+# Installing k8s + dependencies
+
 - name: Package installations
   become: yes
   hosts: dev
@@ -96,3 +99,26 @@
       cmd: |
         systemctl daemon-reload
         systemctl restart kubelet
+
+# Pod Network Plugin install
+
+- name: Install Pod Network Plugin
+  hosts: dev
+  become: yes
+  
+  tasks:
+   - name: Pass bridged IPv4 traffic to iptables' chains
+     command: sysctl net.bridge.bridge-nf-call-iptables=1
+   - name: Install Weave Net
+     shell:
+     cmd: |
+      kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"     
+   - name: Configure portmap k8s plugin
+     copy:
+      src: /home/theone/projects/ansible/includes/10-weave.conflist
+      dest: /etc/cni/net.d/10-weave.conflist
+      owner: ubuntu
+      group: ubuntu
+      mode: '0644'
+      # add confg to /etc/cni/net.d/10-weave.conflist
+      # add confg to /opt/cni/bin/portmap
