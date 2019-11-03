@@ -1,7 +1,7 @@
 ---
-# Playbook for deploying kubeadm on target hosts
+# Playbook for deploying k8s cluster on target hosts
 
-- name: Kubeadm prechecks
+- name: Prechecks
   hosts: dev
   become: yes
 
@@ -17,6 +17,7 @@
           - iptables
           - arptables
           - ebtables
+
 # Only run this if you have to!
 #  - name: Update iptables options for kubeadm compatibility
 #  command: "{{ item }}"
@@ -73,6 +74,7 @@
           - apt-transport-https
           - curl
         force_apt_get: yes
+        update_cache: yes
 
     - name: Add Kubernetes repo
       shell:
@@ -100,9 +102,29 @@
         systemctl daemon-reload
         systemctl restart kubelet
 
-# Pod Network Plugin install
+- name: Initialize control plane node
+  hosts: master
+  become: yes
 
-- name: Install Pod Network Plugin
+  tasks:
+    - name: Verify connectivity to registry
+      command: kubeadm config images pull
+
+    - name: Initialize master node
+      command: kubeadm init --control-plane-endpoint=192.168.0.102 kronos --node-name master
+      register: init_output
+
+    - name: Setup kubectl for non-root user
+      shell:
+      cmd: |
+        mkdir -p $HOME/.kube
+        cp /etc/kubernetes/admin.conf $HOME/.kube/config
+        chown ubuntu. $HOME/.kube/config
+        export KUBECONFIG=$HOME/admin.conf
+
+# Pod network plugin install
+
+- name: Install pod network addon
   hosts: dev
   become: yes
 
@@ -134,19 +156,14 @@
         protocol: udp
         destination_port: "6783:6784"
         jump: ACCEPT
-    # weave installation
-    - name: Install Weave Net
-      shell:
-      cmd: |
-        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
     # portmap setup
     - name: Install portmap binary to /opt/cni/bin/portmap
       shell:
       cmd: |
         git clone https://github.com/containernetworking/plugins
-        cd plugins
-        ./build.sh
-        cp bin/* /opt/cni/bin/
+        ./plugins/build_linux.sh
+        cp ./plugins/bin/* /opt/cni/bin/
+        rm -rf ./plugins
     - name: Copy portmap config to /etc/cni/net.d/10-weave.conflist
       copy:
         src: /home/theone/projects/ansible/includes/10-weave.conflist
@@ -154,24 +171,27 @@
         owner: ubuntu
         group: ubuntu
         mode: "0644"
+    # weave installation
+    - name: Install Weave Net
+      shell:
+      cmd: |
+        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+        kubelet --network-plugin=portmap
+    - name: Check pod network is running
+      command: kubectl get pods --all-namespaces
 
-- name: Initialize control plane node
+- name: Join workers nodes
+  hosts: workers
+  become: yes
+
+  tasks:
+    - name: kubeadm join
+      shell: $(kubeadm token create --print-join-command)
+
+- name: Check status of cluster
   hosts: master
   become: yes
 
   tasks:
-    - name: Verify connectivity to registry
-      command: kubeadm config images pull
-
-    - name: Initialize master node
-      command: kubeadm init --control-plane-endpoint=192.168.0.102 kronos --node-name master
-      register: init_output
-
-    - name: Setup kubectl for non-root user
-      shell:
-      cmd: |
-        mkdir -p $HOME/.kube
-        cp /etc/kubernetes/admin.conf $HOME/.kube/config
-        chown ubuntu. $HOME/.kube/config
-          
-           # kubelet --network-plugin=portmap
+    - name: kubectl list
+      command: kubectl get nodes
