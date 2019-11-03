@@ -3,26 +3,21 @@ charon
 kronos
 hephaestus
 talos
-onetruegingeraffe.com
 
 [bastion]
 charon
-
-[prod]
-onetruegingeraffe.com
 
 [dev]
 kronos
 hephaestus
 talos
 
-[pi:children]
-bastion
-dev
+[master]
+kronos
 
-[docker:children]
-prod
-dev
+[workers]
+hephaestus
+talos
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3

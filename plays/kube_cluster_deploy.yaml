@@ -1,0 +1,78 @@
+---
+# Playbook for deploying kubeadm on target hosts
+
+ - name: Kubeadm prechecks
+   hosts: dev
+   become: yes
+
+   tasks:
+
+   - name: Check if legacy iptables options exist
+     apt:
+        force_apt_get: yes
+        pkg:
+        - iptables
+        - arptables
+        - ebtables
+# Only run this if you have to!
+#   - name: Update iptables options for kubeadm compatibility
+#     command: "{{ item }}" 
+#     args:
+#     with_items:
+#      - update-alternatives --set iptables /usr/sbin/iptables-legacy
+#      - update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+#      - update-alternatives --set arptables /usr/sbin/arptables-legacy
+#      - update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+ 
+ - name: Open ports for master
+   hosts: master
+   become: yes
+
+   tasks:
+   - name: Add iptables rules for master node
+     iptables:
+       chain: INPUT
+       protocol: tcp
+       destination_port: "{{ item }}"
+       jump: ACCEPT
+     with_items:
+        - "6443"
+        - "2379:2380"
+        - "10250"
+        - "10251"
+        - "10252"
+
+ - name: Updating firewall rules for cluster
+   hosts: workers
+   become: yes
+   
+   tasks:
+   
+   - name: Add iptables rules for worker nodes
+     iptables:
+       chain: INPUT
+       protocol: tcp
+       destination_port: "{{ item }}"
+       jump: ACCEPT
+     with_items:
+      - "10250"
+      - "30000:32767"
+ 
+ - name: Package installations
+   become: yes
+   hosts:
+     dev
+   tasks:
+
+   - name: Install Docker
+     apt:
+      name: docker
+      force_apt_get: yes
+  
+   - name: Install kubeadm stuff
+     apt:
+      force_apt_get: yes
+      pkg:
+       kubeadm
+       kubelet
+       kubectl

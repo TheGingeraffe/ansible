@@ -7,12 +7,12 @@
   hosts:
           dev
   tasks:
-
+# Get dependencies out of here if possible
     - name: Check dbus
       apt:
         name: dbus
         force_apt_get: yes
-
+#
     - name: Set hostname
       hostname:
         name: "{{ ansible_host }}"
