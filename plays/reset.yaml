@@ -1,5 +1,23 @@
 ---
-- name: Resets k8s env for cluster
+- name: Shuts down all nodes
+  hosts: master
+
+  tasks:
+   - name: Drain and destroy all nodes
+     shell: |
+      kubectl drain "{{ item }}" --delete-local-data --force --ignore-daemonsets
+      kubectl delete node "{{ item }}"
+     with_items: "{{ groups['dev'] }}"
+
+- name: Resets all kubeadm connections
+  hosts: dev
+  become: yes
+
+  tasks: 
+   - name: Kubeadm reset
+     command: kubeadm reset -f
+  
+- name: Resets iptables rules for cluster
   hosts: dev
   become: yes
   
@@ -22,24 +40,6 @@
       flush: yes
      with_items: [ 'INPUT', 'OUTPUT', 'PREROUTING', 'POSTROUTING' ]
 
-- name: Shuts down master node
-  hosts: master
-
-  tasks:
-   - name: Drain all nodes
-     shell: |
-      kubectl drain "{{ item }}" --delete-local-data --force --ignore-daemonsets
-      kubectl delete node "{{ item }}"
-     with_items: "{{ groups['dev'] }}"
-
-- name: Resets all kubeadm connections
-  hosts: dev
-  become: yes
-
-  tasks: 
-   - name: Kubeadm reset
-     command: kubeadm reset
-  
 - name: Remove config stuff
   hosts: dev
   become: yes
