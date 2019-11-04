@@ -7,7 +7,16 @@
 
   tasks:
     - name: Disable swap
-      command: swapoff --all
+      command: swapoff --all 
+
+    - name: Memory cgroup for pi4
+      lineinfile:
+       path: /boot/firmware/nobtcmd.txt
+       regex: '(^.*$)' # end of line 
+       line: net.ifnames=0 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait cgroup_enable=memory cgroup_memory=1
+    
+    - name: Reboot to apply memory cgroup
+      reboot:
 
     # iptables checks start here
     - name: Check if legacy iptables options exist
@@ -67,18 +76,18 @@
   become: yes
   hosts: dev
   tasks:
+
     - name: Install dependencies
       apt:
         pkg:
-          - docker
+          - docker.io
           - apt-transport-https
           - curl
         force_apt_get: yes
         update_cache: yes
-
+  
     - name: Add Kubernetes repo
-      shell:
-      cmd: |
+      shell: |
         curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
         cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
         deb https://apt.kubernetes.io/ kubernetes-xenial main
@@ -93,30 +102,46 @@
           - kubelet
           - kubectl
 
-    - name: Hold back Kube updates
+    - name: Hold back k8s updates
       command: apt-mark hold kubelet kubeadm kubectl
 
-    - name: Restart kubelet
-      shell:
-      cmd: |
+    - name: Enable services
+      shell: |
+        systemctl enable docker.service
+
+    - name: Set default cgroup driver to systemd
+      copy:
+        src: /home/theone/projects/ansible/includes/docker_daemon.json
+        dest: /etc/docker/daemon.json
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    - name: Create dir for docker systemd
+      file: 
+       path: /etc/systemd/system/docker.service.d
+       state: directory
+       owner: ubuntu
+       group: ubuntu
+       mode: "0755"
+      
+    - name: Restart affected services
+      shell: |
         systemctl daemon-reload
         systemctl restart kubelet
+        systemctl restart docker
 
 - name: Initialize control plane node
   hosts: master
   become: yes
 
   tasks:
-    - name: Verify connectivity to registry
-      command: kubeadm config images pull
-
     - name: Initialize master node
-      command: kubeadm init --control-plane-endpoint=192.168.0.102 kronos --node-name master
+      command: kubeadm init --control-plane-endpoint 192.168.0.102
       register: init_output
 
     - name: Setup kubectl for non-root user
-      shell:
-      cmd: |
+      shell: |
         mkdir -p $HOME/.kube
         cp /etc/kubernetes/admin.conf $HOME/.kube/config
         chown ubuntu. $HOME/.kube/config
@@ -158,8 +183,7 @@
         jump: ACCEPT
     # portmap setup
     - name: Install portmap binary to /opt/cni/bin/portmap
-      shell:
-      cmd: |
+      shell: |
         git clone https://github.com/containernetworking/plugins
         ./plugins/build_linux.sh
         cp ./plugins/bin/* /opt/cni/bin/
@@ -173,8 +197,7 @@
         mode: "0644"
     # weave installation
     - name: Install Weave Net
-      shell:
-      cmd: |
+      shell: |
         kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
         kubelet --network-plugin=portmap
     - name: Check pod network is running
