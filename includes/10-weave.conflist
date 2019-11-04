@@ -1,17 +1,10 @@
 {
-        "cniVersion": "0.3.1",
+        "cniVersion": "0.3.0",
         "name": "mynet",
         "plugins": [
                 {
-                        "name": "weave",
-                        "type": "weave-net",
-                        "hairpinMode": true
-                },
-                {
                         "type": "portmap",
                         "capabilities": {"portMappings": true},
-                        "externalSetMarkChain": "KUBE-MARK-MASQ",
-                        "conditionsV4": ["!", "-d", "192.168.0.0/24"]
                  }
         ]
 }

@@ -131,21 +131,20 @@
         systemctl restart kubelet
         systemctl restart docker
 
-- name: Initialize control plane node
-  hosts: master
-  become: yes
-
-  tasks:
-    - name: Initialize master node
-      command: kubeadm init --control-plane-endpoint 192.168.0.102
-      register: init_output
-
-    - name: Setup kubectl for non-root user
-      shell: |
-        mkdir -p $HOME/.kube
-        cp /etc/kubernetes/admin.conf $HOME/.kube/config
-        chown ubuntu. $HOME/.kube/config
-        export KUBECONFIG=$HOME/admin.conf
+#- name: Initialize control plane node
+#  hosts: master
+#  become: yes
+#
+#  tasks:
+#    - name: Initialize master node
+#      command: kubeadm init --control-plane-endpoint 192.168.0.102
+#
+#    - name: Setup kubectl for non-root user
+#      shell: |
+#        mkdir -p /home/ubuntu/.kube
+#        cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+#        chown ubuntu. /home/ubuntu/.kube/config
+#        export KUBECONFIG=/home/ubuntu/.kube/conf
 
 # Pod network plugin install
 
@@ -187,7 +186,15 @@
         git clone https://github.com/containernetworking/plugins
         ./plugins/build_linux.sh
         cp ./plugins/bin/* /opt/cni/bin/
+        chown -R ubuntu. /opt/cni/bin
         rm -rf ./plugins
+    - name: Create dir for cni confs
+      file: 
+       path: /etc/cni/net.d
+       state: directory
+       owner: ubuntu
+       group: ubuntu
+       mode: "0755"
     - name: Copy portmap config to /etc/cni/net.d/10-weave.conflist
       copy:
         src: /home/theone/projects/ansible/includes/10-weave.conflist
