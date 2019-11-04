@@ -136,7 +136,7 @@
 
   tasks:
     - name: Initialize master node
-      command: kubeadm init --control-plane-endpoint kronos --pod-network-cidr=10.0.0.0/16
+      command: kubeadm init --control-plane-endpoint "{{ ansible_host }}" --pod-network-cidr=10.0.0.0/16
 
     - name: Setup kubectl for non-root user
       shell: |
@@ -173,8 +173,6 @@
       sed -i -e "s?192.168.0.0/16?$POD_CIDR?g" calico.yaml
       kubectl apply -f calico.yaml
       rm calico.yaml
-
-# Try Calico
 
 - name: Join workers nodes
   hosts: workers
