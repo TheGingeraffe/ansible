@@ -200,10 +200,3 @@
     - name: kubeadm join
       shell: "{{ hostvars[item]['kubeadm_join'].stdout }}"
       with_items: "{{ groups['master'] }}"
-
-- name: Check status of cluster
-  hosts: master
-
-  tasks:
-    - name: kubectl list
-      command: kubectl get nodes
