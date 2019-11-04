@@ -174,13 +174,22 @@
       kubectl apply -f calico.yaml
       rm calico.yaml
 
+- name: Export join command
+  hosts: master
+  become: yes
+
+  tasks:
+   - name: List kubeadm join command
+     command: kubeadm token create --print-join-command
+     register: kubeadm_join
+
 - name: Join workers nodes
   hosts: workers
   become: yes
 
   tasks:
     - name: kubeadm join
-      shell: $(kubeadm token create --print-join-command)
+      shell: "{{ kubeadm_join }}"
 
 - name: Check status of cluster
   hosts: master
