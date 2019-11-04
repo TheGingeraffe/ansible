@@ -12,7 +12,7 @@
     - name: Memory cgroup for pi4
       lineinfile:
         path: /boot/firmware/nobtcmd.txt
-        regex: "(^.*$)" # end of line
+        regex: "(^.*$)"
         line: net.ifnames=0 dwc_otg.lpm_enable=0 console=ttyAMA0,115200 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait cgroup_enable=memory cgroup_memory=1
 
     - name: Reboot to apply memory cgroup
@@ -136,7 +136,8 @@
 
   tasks:
     - name: Initialize master node
-      command: kubeadm init --control-plane-endpoint "{{ ansible_host }}" --pod-network-cidr=10.0.0.0/16
+      command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
+      with_items: "{{ groups['master'] }}"
 
     - name: Setup kubectl for non-root user
       shell: |
@@ -144,6 +145,8 @@
         cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
         chown ubuntu. /home/ubuntu/.kube/config
         export KUBECONFIG=/home/ubuntu/.kube/config
+        systemctl daemon-reload
+        systemctl restart kubelet
 
 # Pod network plugin install
 
@@ -173,30 +176,30 @@
       sed -i -e "s?192.168.0.0/16?$POD_CIDR?g" calico.yaml
       kubectl apply -f calico.yaml
       rm calico.yaml
+      systemctl daemon-reload
+      systemctl restart kubelet
 
 - name: Join cluster
-  hosts: dev
+  hosts: master
   
   tasks:
 
    - name: List kubeadm join command
      shell: kubeadm token create --print-join-command
      register: kubeadm_join
-     when: inventory_hostname in groups['master']
 
    - name: Set the fact
      set_fact:
-     kubeadm_join: "{{ kubeadm_join }}"
-     when: inventory_hostname in groups['master']
+      kubeadm_join: "{{ kubeadm_join }}"
 
 - name: Join workers nodes
   hosts: workers
   become: yes
-  shell: 
 
   tasks:
     - name: kubeadm join
-      shell: "{{ kubeadm_join }}"
+      shell: "{{ hostvars[item]['kubeadm_join'].stdout }}"
+      with_items: "{{ groups['master'] }}"
 
 - name: Check status of cluster
   hosts: master
