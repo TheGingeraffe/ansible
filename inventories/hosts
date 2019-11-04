@@ -7,17 +7,16 @@ talos
 [bastion]
 charon
 
-[dev]
-kronos
-hephaestus
-talos
-
 [master]
 kronos
 
 [workers]
 hephaestus
 talos
+
+[dev:children]
+master
+workers
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3

@@ -1,0 +1,23 @@
+---
+- name: Join and test cluster
+  hosts: dev
+  
+  tasks:
+
+  - name: List kubeadm join command
+    shell: kubeadm token create --print-join-command
+    register: kubeadm_join
+    when: inventory_hostname in groups['master']
+
+  - name: Set the fact
+    set_fact:
+      kubeadm_join: "{{ kubeadm_join }}"
+    when: inventory_hostname in groups['master']
+
+  - name: list the var
+    debug:
+     msg: 
+      "{% for host in groups['master'] %}
+        {{ hostvars[host]['kubeadm_join'].stdout }}
+       {% endfor %}"
+    
