@@ -1,0 +1,35 @@
+---
+# Playbook for kubernetes config
+
+# TODO add conditional execution to all calls
+# TODO get non-idempotent vars out of here
+
+# Installs Calico network addon to master nodes
+- name: Install pod network addon
+  hosts: master
+  become: yes
+
+  tasks:
+   - name: Create NetworkManager conf.d dir
+     file:
+      path: /etc/NetworkManager/conf.d
+      state: directory
+      owner: ubuntu
+      group: ubuntu
+      mode: "0755"
+   - name: Create NetworkManager calico.conf
+     copy:
+      src: /home/theone/projects/ansible/includes/calico.conf
+      dest: /etc/NetworkManager/conf.d/calico.conf
+      owner: ubuntu
+      group: ubuntu
+      mode: "0644"
+   - name: Acquire and apply Calico manifest
+     shell: |
+      wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml 
+      POD_CIDR="10.0.0.0/16"
+      sed -i -e "s?192.168.0.0/16?$POD_CIDR?g" calico.yaml
+      kubectl apply -f calico.yaml
+      rm calico.yaml
+      systemctl daemon-reload
+      systemctl restart kubelet

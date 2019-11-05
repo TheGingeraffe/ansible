@@ -1,5 +1,9 @@
 ---
 # Initializes master node for master group, worker nodes for worker group
+
+# TODO add conditional execution to all command/shell/iptables/lineinfile calls
+# TODO get non-idempotent vars out of here
+
 - name: Join cluster
   hosts: master
   
