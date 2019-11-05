@@ -8,7 +8,7 @@
   hosts: master
   
   tasks:
-
+# Don't do this if it exists
    - name: Initialize master node
      command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
      with_items: "{{ groups['master'] }}"

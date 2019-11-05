@@ -8,7 +8,8 @@
   become: yes
 
   tasks:
-    
+  
+  # Non-shell way? Ansible complains about this
     - name: Add Kubernetes repo
       shell: |
        curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
