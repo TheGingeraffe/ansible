@@ -1,0 +1,9 @@
+---
+- name: Reboot target hosts
+  hosts: dev
+  become: yes
+
+  tasks:
+
+  - name: Reboot gracefully
+    reboot:
