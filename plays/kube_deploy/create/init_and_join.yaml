@@ -28,8 +28,7 @@
   tasks:
 
   - name: Run kubeadm_join on workers
-    debug:
-     msg: "{{ hostvars[item]['kubeadm_join'].stdout }}"
+    shell: "{{ hostvars[item]['kubeadm_join'].stdout }}"
     with_items: "{{ groups['master'] }}"
 
 - name: Label nodes
