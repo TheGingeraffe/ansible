@@ -1,9 +1,14 @@
 ---
+# Initializes master node for master group, worker nodes for worker group
 - name: Join cluster
   hosts: master
   
   tasks:
 
+   - name: Initialize master node
+     command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
+     with_items: "{{ groups['master'] }}"
+   
    - name: List kubeadm join command
      shell: kubeadm token create --print-join-command
      register: kubeadm_join
@@ -22,3 +27,12 @@
     debug:
      msg: "{{ hostvars[item]['kubeadm_join'].stdout }}"
     with_items: "{{ groups['master'] }}"
+
+- name: Label nodes
+  hosts: master
+  
+  tasks:
+
+    - name: Apply roles to worker nodes
+      shell: kubectl label node "{{ item }}" node-role.kubernetes.io/worker=
+      with_items: "{{ groups['workers'] }}"
