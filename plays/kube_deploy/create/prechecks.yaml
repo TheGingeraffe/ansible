@@ -8,14 +8,17 @@
   become: yes
 
   tasks:
+
+    - name: Add Kubernetes apt key
+      apt-key:
+       id: 54A647F9048D5688D7DA2ABE6A030B21BA07F4FB
+       url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+       state: present
   
-  # Non-shell way? Ansible complains about this
     - name: Add Kubernetes repo
-      shell: |
-       curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-       cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
-       deb https://apt.kubernetes.io/ kubernetes-xenial main
-       EOF
+      apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
 
     - name: Install package dependencies
       apt:
@@ -23,29 +26,39 @@
           - iptables
           - arptables
           - ebtables
+          - iptables-persistent
           - docker.io
           - apt-transport-https
+          - ca-certificates
+          - gnupg-agent
+          - software-properties-common
           - curl
           - kubeadm
           - kubelet
           - kubectl
         force_apt_get: yes
         update_cache: yes
+      notify: docker enable
     
     - name: Hold back k8s updates
-      command: apt-mark hold kubelet kubeadm kubectl 
-
-    - name: Enable services
-      command: systemctl enable docker.service
+      dpkg_selections:
+       name: "{{ item }}"
+       selection: hold 
+      with_items:
+      - kubeadm
+      - kubelet
+      - kubectl
 
     - name: Update iptables options for kubeadm compatibility
-      command: "{{ item }}"
-      args:
+      alternatives:
+       name: "{{ item }}"
+       link: /usr/sbin/"{{ item }}"
+       path: /usr/sbin/"{{ item }}"-legacy
       with_items:
-        - update-alternatives --set iptables /usr/sbin/iptables-legacy
-        - update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-        - update-alternatives --set arptables /usr/sbin/arptables-legacy
-        - update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+        - iptables
+        - ip6tables
+        - arptables
+        - ebtables
 
 - name: Updating firewall rules for master
   hosts: master
@@ -64,6 +77,7 @@
         - "10250"
         - "10251"
         - "10252"
+      notify: iptables_save
 
 - name: Updating firewall rules for workers
   hosts: workers
@@ -79,6 +93,7 @@
       with_items:
         - "10250"
         - "30000:32767"
+      notify: iptables_save
 
 - name: Node config tasks
   hosts: dev
@@ -111,6 +126,7 @@
     
     - name: Disable swap
       command: swapoff --all
+      when: something
 
     - name: Memory cgroup for pi4
       lineinfile:
@@ -120,3 +136,13 @@
     
     - name: Reboot to apply memory cgroup
       reboot:
+
+  handlers:
+   - name: docker enable
+     service: name=docker state=enabled
+   
+   - name: iptables_save
+     shell: |
+     if [[ ! -d /etc/iptables ]]; then
+     "iptables-save > /etc/iptables/";
+     fi
