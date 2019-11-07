@@ -1,20 +1,22 @@
 ---
 # Initializes master node for master group, worker nodes for worker group
 
-# TODO add conditional execution to all command/shell/iptables/lineinfile calls
-# TODO get non-idempotent vars out of here
-
 - name: Join cluster
   hosts: master
+  become: yes
   
   tasks:
-# Don't do this if it exists
+
+   - name: Check if node exists
+     command: "kubectl get nodes | grep {{ ansible_host }}"
+     register: node_status
+   
    - name: Initialize master node
      command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
-     with_items: "{{ groups['master'] }}"
+     when: node_status.stdout == ''
    
    - name: List kubeadm join command
-     shell: kubeadm token create --print-join-command
+     command: kubeadm token create --print-join-command
      register: kubeadm_join
 
    - name: Set the fact
@@ -28,11 +30,51 @@
   tasks:
 
   - name: Run kubeadm_join on workers
-    shell: "{{ hostvars[item]['kubeadm_join'].stdout }}"
+    command: "{{ hostvars[item]['kubeadm_join'].stdout }}"
     with_items: "{{ groups['master'] }}"
+
+- name: Set up kubectl for non-root user
+  hosts: dev
+  become: yes
+  gather_facts: false
+
+  tasks:
+
+   - name: Make .kube dir for non-root user
+     file:
+      path: "/home/{{ ansible_user }}/.kube"
+      state: directory
+
+   - name: Check for existence of ${KUBECONFIG}
+     shell: "echo $KUBECONFIG"
+     register: k8_var_check
+
+   - name: Copy kubeadm config
+     copy:
+      src: /etc/kubernetes/admin.conf
+      dest: "/home/{{ ansible_user }}/.kube/config"
+      remote_src: yes
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: "0644"
+
+   - name: Export config location for current session
+     shell: "su - {{ ansible_user|quote }} -c export KUBECONFIG=/home/{{ ansible_user|quote }}/.kube/config"
+     when: k8_var_check.stdout == ''
+     notify: export_kubeconfig
+  
+  handlers:
+
+   - name: export_kubeconfig
+     shell: >
+        echo
+        'KUBECONFIG="/home/{{ ansible_user|quote }}/.kube/config"'
+        >>
+        /etc/environment
 
 - name: Label nodes
   hosts: master
+  gather_facts: false
   
   tasks:
 

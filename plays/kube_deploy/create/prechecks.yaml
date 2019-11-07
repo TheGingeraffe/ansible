@@ -8,8 +8,9 @@
   become: yes
 
   tasks:
+    
     - name: Add Kubernetes apt key
-      apt-key:
+      apt_key:
         id: 54A647F9048D5688D7DA2ABE6A030B21BA07F4FB
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
         state: present
@@ -60,6 +61,7 @@
 
 - name: Updating firewall rules for master
   hosts: master
+  gather_facts: false
   become: yes
 
   tasks:
@@ -75,21 +77,22 @@
         - "10250"
         - "10251"
         - "10252"
-      notify: "iptables setup"
+      notify:
+        - iptables_dir_check
+        - iptables_save
 
   handlers:
-    - name: iptables_dir
+    - name: iptables_dir_check
       file:
         path: /etc/iptables
         state: directory
-      listen: "iptables setup"
 
     - name: iptables_save
       shell: "iptables-save > /etc/iptables/rules.v4"
-      listen: "iptables setup"
 
 - name: Updating firewall rules for workers
   hosts: workers
+  gather_facts: false
   become: yes
 
   tasks:
@@ -102,21 +105,22 @@
       with_items:
         - "10250"
         - "30000:32767"
-      notify: "iptables setup"
+      notify:
+        - iptables_dir_check
+        - iptables_save
 
   handlers:
-    - name: iptables_dir
+    - name: iptables_dir_check
       file:
         path: /etc/iptables
         state: directory
-      listen: "iptables setup"
 
     - name: iptables_save
       shell: "iptables-save > /etc/iptables/rules.v4"
-      listen: "iptables setup"
 
 - name: Node config tasks
   hosts: dev
+  gather_facts: false
   become: yes
 
   tasks:
@@ -127,44 +131,24 @@
         owner: root
         group: root
         mode: "0600"
-      notify: "docker setup"
+      notify:
+        - docker_enable
+        - docker_systemd_dir_check
 
-    - name: Setup kubectl for non-root user
-      shell: |
-        "mkdir -p /home/{ ansible_user }/.kube
-        cp /etc/kubernetes/admin.conf /home/{ ansible_user }/.kube/config
-        chown { ansible_user }. /home/{ ansible_user }/.kube/config
-        export KUBECONFIG=/home/{ ansible_user }/.kube/config
-        echo ${KUBECONFIG} >> /etc/environment"
-      when: "[[ -z ${KUBECONFIG} ]]"
+    - name: Check for swap
+      command: grep -Po '(?<=SwapTotal:\s{13}).+(?= \w+)' /proc/meminfo
+      register: swap_size
 
     - name: Disable swap
       command: swapoff --all
-      when: "[[ $(wc -l /proc/swaps) > 1 ]]"
+      when: swap_size['stdout'] != "0"
 
     - name: Check for existence of memory cgroup
       stat:
-        path: "/sys/fs/cgroup/memory"
+        path: /sys/fs/cgroup/memory
       register: memory_cgroup_check
 
     - name: Enable memory cgroup if it doesn't exist
-      debug:
-        msg: "Enabled memory cgroup for {{ ansible_host }}"
-      when: memory_cgroup_check.stat.islnk is not defined
-      notify: "memory cgroup setup"
-
-  handlers:
-    - name: docker_enable
-      service: name=docker state=enabled
-      listen: "docker setup"
-
-    - name: Create dir for docker systemd
-      file:
-        path: /etc/systemd/system/docker.service.d
-        state: directory
-      listen: "docker setup"
-
-    - name: Enable memory cgroup for pi4
       lineinfile:
         path: /boot/firmware/nobtcmd.txt
         regex: "(^.*$)"
@@ -179,8 +163,18 @@
           rootwait
           cgroup_enable=memory
           cgroup_memory=1
-      listen: "memory cgroup setup"
+      when: memory_cgroup_check.stat.exists == False
+      notify:
+        - Reboot to apply memory cgroup
+
+  handlers:
+    - name: docker_enable
+      command: systemctl enable docker
+
+    - name: docker_systemd_dir_check
+      file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
 
     - name: Reboot to apply memory cgroup
       reboot:
-      listen: "memory cgroup setup"
