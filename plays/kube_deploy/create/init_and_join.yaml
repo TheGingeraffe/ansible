@@ -8,12 +8,12 @@
   tasks:
 
    - name: Check if node exists
-     command: "kubectl get nodes | grep {{ ansible_host }}"
+     shell: "kubectl get nodes | grep {{ ansible_host }}"
      register: node_status
    
    - name: Initialize master node
      command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
-     when: node_status.stdout == ''
+     when: node_status['stdout'] == ''
    
    - name: List kubeadm join command
      command: kubeadm token create --print-join-command
@@ -51,16 +51,18 @@
 
    - name: Copy kubeadm config
      copy:
-      src: /etc/kubernetes/admin.conf
+      src: /home/theone/projects/ansible/includes/kube_config
       dest: "/home/{{ ansible_user }}/.kube/config"
-      remote_src: yes
       owner: "{{ ansible_user }}"
       group: "{{ ansible_user }}"
       mode: "0644"
 
    - name: Export config location for current session
-     shell: "su - {{ ansible_user|quote }} -c export KUBECONFIG=/home/{{ ansible_user|quote }}/.kube/config"
-     when: k8_var_check.stdout == ''
+     shell: |
+      "su - {{ ansible_user|quote }} -c export KUBECONFIG=/home/{{ ansible_user|quote }}/.kube/config
+      systemctl daemon-reload
+      systemctl restart kubelet"
+     when: k8_var_check['stdout'] == ''
      notify: export_kubeconfig
   
   handlers:
@@ -81,3 +83,5 @@
     - name: Apply roles to worker nodes
       shell: kubectl label node "{{ item }}" node-role.kubernetes.io/worker=
       with_items: "{{ groups['workers'] }}"
+      when: 
+  

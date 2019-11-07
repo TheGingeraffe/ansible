@@ -1,8 +1,6 @@
 ---
 # Playbook for kubernetes cluster pre-checks
 
-# TODO add conditional execution to all command/shell/iptables/lineinfile calls
-# TODO get non-idempotent vars out of here
 - name: Prechecks
   hosts: dev
   become: yes
