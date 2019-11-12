@@ -1,0 +1,36 @@
+---
+- name: Updates all pi hosts
+  hosts: pi
+  become: yes
+
+  tasks:
+    - name: Update all packages to the latest version
+      apt:
+       upgrade: "yes"
+       force_apt_get: "yes"
+
+    - name: Upgrade available packages on Pi cluster
+      apt:
+       name: '*'
+       state: latest
+       force_apt_get: "yes"
+
+- name: Update prod CentOS server
+  hosts: centos
+  become: yes
+
+  tasks:
+   - name: Run yum update on all packages
+     yum:
+       name: '*'
+       state: latest
+
+- name: Update Fedora stations
+  hosts: home
+  become: yes
+  
+  tasks:
+  - name: Run dnf update on home stations
+    dnf:
+     name: '*'
+     state: latest

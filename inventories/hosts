@@ -4,6 +4,11 @@ kronos
 hephaestus
 talos
 hermes
+hestia
+hades
+bhvps ansible_user=onetrueh
+theone ansible_user=theone
+docker ansible_user=baal
 
 [bastion]
 charon
@@ -16,15 +21,32 @@ hephaestus
 talos
 hermes
 
+[production]
+theone
+docker
+
+[centos]
+bhvps
+theone
+docker
+
+[home]
+hestia ansible_user=gingeraffe
+hades ansible_user=asmodeus
+
+[pi:children]
+bastion
+dev
+
 [dev:children]
 master
 workers
 
-[all:vars]
+[dev:vars]
 ansible_python_interpreter=/usr/bin/python3
+ansible_user=ubuntu
 
 [bastion:vars]
+ansible_python_interpreter=/usr/bin/python3
 ansible_connection=local
-
-[dev:vars]
-ansible_user=ubuntu
+ansible_user=theone

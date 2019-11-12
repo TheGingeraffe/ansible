@@ -1,0 +1,25 @@
+---
+- name: Get dotfiles to bastion
+  hosts: bastion
+
+  tasks:
+  - name: Get dotfile repo
+    git:
+     repo: "ssh://git@github.com:22/thegingeraffe/dot"
+     dest: "/home/{{ ansible_user }}/projects/dot"
+
+- name: Synchronize bash dotfiles on all hosts
+  hosts: all
+  
+  tasks:
+  - name: Copy dotfiles
+    copy:
+     backup: yes
+     src: "/home/{{ hostvars[groups['bastion'][0]].ansible_user }}/projects/dot/{{ item }}"
+     dest: "/home/{{ ansible_user }}"
+     owner: "{{ ansible_user }}"
+    with_items:
+     - .bashrc
+     - .bash_profile
+     - .bash_aliases
+     - .bash_logout

@@ -1,0 +1,16 @@
+---
+
+check most recent master v of Python?
+
+check installed version of Python?
+
+get some archives of Python
+
+extract
+
+./configure --enable-optimizations
+make altinstall
+
+find python3.X binary and symlink to /usr/local/bin/python3
+
+remove archive and w/e

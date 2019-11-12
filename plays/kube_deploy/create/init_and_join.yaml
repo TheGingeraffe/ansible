@@ -12,7 +12,7 @@
      register: node_status
    
    - name: Initialize master node
-     command: kubeadm init --control-plane-endpoint "{{ hostvars[item]['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
+     command: kubeadm init --control-plane-endpoint "{{ hostvars['master']['ansible_eth0']['ipv4']['address'] }}"  --pod-network-cidr=10.0.0.0/16
      when: node_status['stdout'] == ''
    
    - name: List kubeadm join command
