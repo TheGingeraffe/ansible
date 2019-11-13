@@ -1,0 +1,30 @@
+---
+- name: Makes a system backup and syncs it to backup storage
+  hosts: production
+  become: yes
+
+  tasks:
+  - name: Make the archive
+    archive:
+     path:
+      -
+      -
+      -
+      -
+     dest: "/path/to/foo.{{ ansible_date_time.date }}.tgz"
+     exclude_path:
+      -
+      -
+      -
+      -
+     group:
+     owner:
+     mode:
+
+  - name: Copy it over
+    synchronize:
+      src: "/path/to/foo.{{ ansible_date_time.date }}.tgz"
+      dest: "rsync://hades/var/local/backups/foo.{{ ansible_date_time.date }}.tgz"
+    delegate_to: delegate.host
+
+  - name: Rotate backups if needed

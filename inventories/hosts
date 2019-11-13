@@ -25,6 +25,9 @@ hermes
 theone
 docker
 
+[backup]
+hades
+
 [centos]
 bhvps
 theone
